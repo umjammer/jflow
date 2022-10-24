@@ -21,9 +21,9 @@ package be.pwnt.jflow;
 import java.awt.Cursor;
 import java.awt.Graphics;
 import java.awt.Point;
+import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
-import java.awt.event.MouseListener;
-import java.awt.event.MouseMotionListener;
+import java.awt.event.MouseWheelEvent;
 import java.util.Collection;
 import java.util.HashSet;
 import java.util.Timer;
@@ -39,8 +39,8 @@ import be.pwnt.jflow.geometry.RotationMatrix;
 import be.pwnt.jflow.shape.Picture;
 
 @SuppressWarnings("serial")
-public class JFlowPanel extends JPanel implements MouseListener,
-		MouseMotionListener {
+public class JFlowPanel extends JPanel {
+
 	private Collection<ShapeListener> listeners;
 
 	private Configuration config;
@@ -50,7 +50,6 @@ public class JFlowPanel extends JPanel implements MouseListener,
 	private double scrollDelta;
 
 	private double dragStart;
-
 	private double dragRate;
 
 	private boolean buttonOnePressed;
@@ -80,8 +79,9 @@ public class JFlowPanel extends JPanel implements MouseListener,
 			new Timer().scheduleAtFixedRate(new AutoScroller(), 0,
 					1000 / config.framesPerSecond);
 		}
-		addMouseListener(this);
-		addMouseMotionListener(this);
+		addMouseListener(mouseAdapter);
+		addMouseMotionListener(mouseAdapter);
+		addMouseWheelListener(mouseAdapter);
 	}
 
 	public void addListener(ShapeListener listener) {
@@ -234,67 +234,66 @@ public class JFlowPanel extends JPanel implements MouseListener,
 						.getPredefinedCursor(Cursor.HAND_CURSOR)));
 	}
 
-	@Override
-	public void mouseClicked(MouseEvent e) {
-		if (config.enableShapeSelection && activeShape != null) {
-			ShapeEvent evt = new ShapeEvent(activeShape, e);
-			for (ShapeListener listener : listeners) {
-				listener.shapeClicked(evt);
-			}
-		}
-	}
-
-	@Override
-	public void mouseEntered(MouseEvent e) {
-	}
-
-	@Override
-	public void mouseExited(MouseEvent e) {
-	}
-
-	@Override
-	public void mousePressed(MouseEvent e) {
-		if (e.getButton() == MouseEvent.BUTTON1) {
-			buttonOnePressed = true;
-			dragStart = e.getLocationOnScreen().getX();
-		}
-	}
-
-	@Override
-	public void mouseReleased(MouseEvent e) {
-		buttonOnePressed = false;
-		if (e.getButton() == MouseEvent.BUTTON1) {
-			dragging = false;
-			updateCursor();
-			checkActiveShape();
-			if (config.autoScrollAmount == 0) {
-				if (easingTimer != null) {
-					easingTimer.cancel();
+	private final MouseAdapter mouseAdapter = new MouseAdapter() {
+		@Override
+		public void mouseClicked(MouseEvent e) {
+			if (config.enableShapeSelection && activeShape != null) {
+				ShapeEvent evt = new ShapeEvent(activeShape, e);
+				for (ShapeListener listener : listeners) {
+					listener.shapeClicked(evt);
 				}
-				easingTimer = new Timer();
-				easingTimer.scheduleAtFixedRate(new DragEaser(), 0, 100);
 			}
 		}
-	}
 
-	@Override
-	public void mouseDragged(MouseEvent e) {
-		if (buttonOnePressed) {
-			dragging = true;
-			setActiveShape(null);
-			updateCursor();
-			double dragEnd = e.getLocationOnScreen().getX();
-			dragRate = config.scrollFactor * (dragEnd - dragStart) / getWidth();
-			setScrollRate(getScrollRate()
-					+ (config.inverseScrolling ? dragRate : -dragRate));
-			dragStart = dragEnd;
+		@Override
+		public void mousePressed(MouseEvent e) {
+			if (e.getButton() == MouseEvent.BUTTON1) {
+				buttonOnePressed = true;
+				dragStart = e.getLocationOnScreen().getX();
+			}
 		}
-	}
 
-	@Override
-	public void mouseMoved(MouseEvent e) {
-		checkActiveShape();
-	}
+		@Override
+		public void mouseReleased(MouseEvent e) {
+			buttonOnePressed = false;
+			if (e.getButton() == MouseEvent.BUTTON1) {
+				dragging = false;
+				updateCursor();
+				checkActiveShape();
+				if (config.autoScrollAmount == 0) {
+					if (easingTimer != null) {
+						easingTimer.cancel();
+					}
+					easingTimer = new Timer();
+					easingTimer.scheduleAtFixedRate(new DragEaser(), 0, 100);
+				}
+			}
+		}
+
+		@Override
+		public void mouseDragged(MouseEvent e) {
+			if (buttonOnePressed) {
+				dragging = true;
+				setActiveShape(null);
+				updateCursor();
+				double dragEnd = e.getLocationOnScreen().getX();
+				dragRate = config.scrollFactor * (dragEnd - dragStart) / getWidth();
+				setScrollRate(getScrollRate()
+						+ (config.inverseScrolling ? dragRate : -dragRate));
+				dragStart = dragEnd;
+			}
+		}
+
+		@Override
+		public void mouseMoved(MouseEvent e) {
+			checkActiveShape();
+		}
+
+		@Override
+		public void mouseWheelMoved(MouseWheelEvent e) {
+			setScrollRate(e.getPreciseWheelRotation() * .2f); // TODO
+		}
+	};
 
 	private class AutoScroller extends TimerTask {
 		@Override
